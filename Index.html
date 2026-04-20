@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boxing Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; background: #0a0a0a; color: #fff; font-family: 'Black Ops One', Impact, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding-bottom: 48px; }
+
+#bg-glow {
+position: fixed; inset: 0; pointer-events: none; z-index: 0;
+background: radial-gradient(ellipse at 50% 40%, #141414 0%, #0a0a0a 65%);
+transition: background 0.7s ease;
+}
+#app { position: relative; z-index: 1; width: 100%; max-width: 420px; padding: 0 20px; display: flex; flex-direction: column; align-items: center; }
+
+.label { font-family: ‘Barlow Condensed’, sans-serif; font-weight: 700; letter-spacing: 5px; font-size: 10px; color: #444; }
+
+#header { padding-top: 36px; margin-bottom: 28px; }
+
+/* Ring */
+#ring-wrap { position: relative; width: 260px; height: 260px; margin-bottom: 18px; flex-shrink: 0; }
+#ring-wrap svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
+#ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#time-display { font-size: 64px; line-height: 1; letter-spacing: -2px; color: #fff; transition: color 0.3s; }
+#phase-label { font-family: ‘Barlow Condensed’, sans-serif; font-weight: 700; font-size: 10px; letter-spacing: 6px; color: #e63946; margin-top: 10px; transition: color 0.3s; }
+
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.035)} }
+
+/* Dots */
+#dots { display: flex; gap: 7px; margin-bottom: 10px; flex-wrap: wrap; justify-content: center; max-width: 260px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #252525; transition: background 0.3s, box-shadow 0.3s; }
+.dot.active { background: #fff; box-shadow: 0 0 8px #e63946; }
+.dot.done { background: #e63946; box-shadow: none; }
+
+#round-label { font-family: ‘Barlow Condensed’, sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 4px; color: #444; margin-bottom: 28px; }
+
+/* Buttons */
+#controls { display: flex; gap: 10px; margin-bottom: 14px; width: 100%; }
+.btn { cursor: pointer; border: none; font-family: ‘Black Ops One’, Impact, sans-serif; letter-spacing: 2px; border-radius: 6px; transition: transform 0.12s, opacity 0.12s; -webkit-tap-highlight-color: transparent; }
+.btn:active { transform: scale(0.94); opacity: 0.85; }
+#btn-main { flex: 1; background: #e63946; color: #fff; padding: 16px 0; font-size: 18px; box-shadow: 0 0 28px #e6394650; }
+#btn-reset { background: #151515; color: #555; padding: 16px 18px; font-size: 13px; border: 1px solid #222; }
+#btn-settings { background: #151515; color: #555; padding: 16px 18px; font-size: 18px; border: 1px solid #222; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+#btn-settings.open { background: #141420; color: #7b8cde; border-color: #3a3a6a; }
+
+/* Settings panel */
+#settings {
+background: #111; border: 1px solid #1e1e1e; border-radius: 10px;
+padding: 20px; width: 100%;
+animation: slideDown 0.25s ease;
+}
+@keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+
+.presets { display: flex; gap: 8px; margin-bottom: 24px; }
+.preset-btn { flex: 1; background: #1a1a1a; color: #777; padding: 10px 4px; font-size: 11px; letter-spacing: 2px; border-radius: 5px; border: 1px solid #2a2a2a; font-family: ‘Barlow Condensed’, sans-serif; font-weight: 700; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.preset-btn:hover { background: #222; color: #aaa; }
+.preset-btn:active { transform: scale(0.95); }
+
+.slider-row { margin-bottom: 22px; }
+.slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.slider-val { font-family: ‘Barlow Condensed’, sans-serif; font-weight: 700; font-size: 14px; color: #e63946; }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 5px; border-radius: 3px; background: #222; outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #e63946; cursor: pointer; box-shadow: 0 0 10px #e6394666; }
+input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #e63946; cursor: pointer; border: none; }
+</style>
+
+</head>
+<body>
+<div id="bg-glow"></div>
+<div id="app">
+  <div id="header" class="label">◆ BOXING TIMER ◆</div>
+
+  <div id="ring-wrap">
+    <svg width="260" height="260" id="ring-svg">
+      <circle cx="130" cy="130" r="110" fill="none" stroke="#1c1c1c" stroke-width="10"/>
+      <circle id="ring-progress" cx="130" cy="130" r="110" fill="none" stroke="#e63946"
+        stroke-width="10" stroke-linecap="round"
+        stroke-dasharray="0 691.15" style="transition: stroke-dasharray 0.85s linear, stroke 0.4s ease"/>
+    </svg>
+    <div id="ring-center">
+      <div id="time-display">03:00</div>
+      <div id="phase-label">READY</div>
+    </div>
+  </div>
+
+  <div id="dots"></div>
+  <div id="round-label">ROUND 1 OF 3</div>
+
+  <div id="controls">
+    <button class="btn" id="btn-main" onclick="handleMain()">START</button>
+    <button class="btn" id="btn-reset" onclick="handleReset()">RESET</button>
+    <button class="btn" id="btn-settings" onclick="toggleSettings()">⚙</button>
+  </div>
+
+  <div id="settings">
+    <div class="label" style="margin-bottom:10px">PRESETS</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="applyPreset(3,120,60)">AMATEUR</button>
+      <button class="preset-btn" onclick="applyPreset(12,180,60)">PRO</button>
+      <button class="preset-btn" onclick="applyPreset(6,60,30)">HIIT</button>
+    </div>
+
+```
+<div class="slider-row">
+  <div class="slider-header">
+    <span class="label">ROUNDS</span>
+    <span class="slider-val" id="val-rounds">3</span>
+  </div>
+  <input type="range" id="sl-rounds" min="1" max="20" step="1" value="3" oninput="onSlider()">
+</div>
+<div class="slider-row">
+  <div class="slider-header">
+    <span class="label">ROUND TIME</span>
+    <span class="slider-val" id="val-roundtime">03:00</span>
+  </div>
+  <input type="range" id="sl-roundtime" min="30" max="600" step="30" value="180" oninput="onSlider()">
+</div>
+<div class="slider-row" style="margin-bottom:0">
+  <div class="slider-header">
+    <span class="label">REST TIME</span>
+    <span class="slider-val" id="val-resttime">01:00</span>
+  </div>
+  <input type="range" id="sl-resttime" min="10" max="180" step="10" value="60" oninput="onSlider()">
+</div>
+```
+
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let rounds = 3, roundTime = 180, restTime = 60;
+let currentRound = 1, timeLeft = 180;
+let phase = 'idle'; // idle | round | rest | done
+let running = false;
+let intervalId = null;
+let audioCtx = null;
+
+const CIRC = 2 * Math.PI * 110; // 691.15
+
+// ─── Audio ────────────────────────────────────────────────────────────────────
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function beep(freq, dur, vol, delay = 0) {
+  const ctx = getAudio();
+  const t = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.start(t); osc.stop(t + dur);
+}
+
+function ringBell(count) {
+  const ctx = getAudio();
+  for (let i = 0; i < count; i++) {
+    const t = ctx.currentTime + i * 0.55;
+    [900, 1350].forEach(freq => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.65, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  }
+}
+
+function countdownBeep() { beep(500, 0.07, 0.25); }
+
+// ─── Format ───────────────────────────────────────────────────────────────────
+function fmt(s) {
+  return String(Math.floor(s / 60)).padStart(2,'0') + ':' + String(s % 60).padStart(2,'0');
+}
+
+// ─── Timer logic ──────────────────────────────────────────────────────────────
+function startInterval() {
+  clearInterval(intervalId);
+  intervalId = setInterval(() => {
+    if (timeLeft <= 1) {
+      if (phase === 'round') {
+        if (currentRound >= rounds) {
+          ringBell(3);
+          phase = 'done'; running = false;
+          timeLeft = 0;
+          clearInterval(intervalId);
+          render(); return;
+        }
+        ringBell(3);
+        currentRound++;
+        phase = 'rest';
+        timeLeft = restTime;
+      } else {
+        ringBell(1);
+        phase = 'round';
+        timeLeft = roundTime;
+      }
+    } else {
+      timeLeft--;
+      if (timeLeft <= 3 && timeLeft > 0) countdownBeep();
+    }
+    render();
+  }, 1000);
+}
+
+function handleMain() {
+  getAudio();
+  if (phase === 'idle' || phase === 'done') {
+    phase = 'round'; currentRound = 1; timeLeft = roundTime;
+  }
+  running = true;
+  startInterval();
+  render();
+}
+
+function handleReset() {
+  clearInterval(intervalId);
+  running = false; phase = 'idle'; currentRound = 1; timeLeft = roundTime;
+  render();
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settings');
+  const btn = document.getElementById('btn-settings');
+  const hidden = panel.style.display === 'none';
+  panel.style.display = hidden ? 'block' : 'none';
+  btn.classList.toggle('open', hidden);
+}
+
+function applyPreset(r, rt, rest) {
+  clearInterval(intervalId);
+  running = false; rounds = r; roundTime = rt; restTime = rest;
+  phase = 'idle'; currentRound = 1; timeLeft = roundTime;
+  document.getElementById('sl-rounds').value = r;
+  document.getElementById('sl-roundtime').value = rt;
+  document.getElementById('sl-resttime').value = rest;
+  render();
+}
+
+function onSlider() {
+  rounds = +document.getElementById('sl-rounds').value;
+  roundTime = +document.getElementById('sl-roundtime').value;
+  restTime = +document.getElementById('sl-resttime').value;
+  // update labels
+  document.getElementById('val-rounds').textContent = rounds;
+  document.getElementById('val-roundtime').textContent = fmt(roundTime);
+  document.getElementById('val-resttime').textContent = fmt(restTime);
+  // reset timer
+  clearInterval(intervalId);
+  running = false; phase = 'idle'; currentRound = 1; timeLeft = roundTime;
+  render();
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  const isRest = phase === 'rest';
+  const isDone = phase === 'done';
+  const isIdle = phase === 'idle';
+  const accent = isRest ? '#0096c7' : isDone ? '#52b788' : '#e63946';
+
+  // Background
+  const bg = document.getElementById('bg-glow');
+  if (isRest) bg.style.background = 'radial-gradient(ellipse at 50% 40%, #0d2b3e 0%, #0a0a0a 65%)';
+  else if (isDone) bg.style.background = 'radial-gradient(ellipse at 50% 40%, #1a2e0a 0%, #0a0a0a 65%)';
+  else if (running) bg.style.background = 'radial-gradient(ellipse at 50% 40%, #2a0808 0%, #0a0a0a 65%)';
+  else bg.style.background = 'radial-gradient(ellipse at 50% 40%, #141414 0%, #0a0a0a 65%)';
+
+  // Progress ring
+  const totalTime = isRest ? restTime : roundTime;
+  const progress = totalTime > 0 ? timeLeft / totalTime : 0;
+  const dash = progress * CIRC;
+  const ring = document.getElementById('ring-progress');
+  ring.setAttribute('stroke-dasharray', `${dash} ${CIRC}`);
+  ring.setAttribute('stroke', accent);
+
+  // Time & phase
+  const timeEl = document.getElementById('time-display');
+  const phaseEl = document.getElementById('phase-label');
+
+  if (isDone) {
+    timeEl.textContent = 'DONE';
+    timeEl.style.fontSize = '48px';
+    timeEl.style.color = '#52b788';
+    phaseEl.textContent = 'FINAL BELL';
+    phaseEl.style.color = '#52b788';
+  } else {
+    timeEl.textContent = fmt(timeLeft);
+    timeEl.style.fontSize = '64px';
+    timeEl.style.color = isRest ? '#0096c7' : '#fff';
+    timeEl.style.animation = running && !isRest ? 'pulse 1s ease-in-out infinite' : 'none';
+    phaseEl.textContent = isIdle ? 'READY' : isRest ? 'REST' : 'ROUND';
+    phaseEl.style.color = accent;
+  }
+
+  // Dots
+  const dotsEl = document.getElementById('dots');
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < rounds; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    const completed = isDone || i < currentRound - (phase === 'round' ? 1 : 0);
+    const active = !isDone && i === currentRound - 1 && phase === 'round';
+    if (completed) d.classList.add('done');
+    else if (active) d.classList.add('active');
+    dotsEl.appendChild(d);
+  }
+
+  // Round label
+  document.getElementById('round-label').textContent =
+    isDone ? `${rounds} ROUNDS COMPLETE` : `ROUND ${currentRound} OF ${rounds}`;
+
+  // Main button
+  const btnMain = document.getElementById('btn-main');
+  if (running) {
+    btnMain.textContent = 'PAUSE';
+    btnMain.style.background = '#1e1e1e';
+    btnMain.style.color = '#ccc';
+    btnMain.style.boxShadow = 'none';
+    btnMain.style.border = '1px solid #333';
+    btnMain.onclick = () => { running = false; clearInterval(intervalId); render(); };
+  } else if (isDone) {
+    btnMain.textContent = 'AGAIN';
+    btnMain.style.background = '#e63946';
+    btnMain.style.color = '#fff';
+    btnMain.style.boxShadow = '0 0 28px #e6394650';
+    btnMain.style.border = 'none';
+    btnMain.onclick = handleReset;
+  } else {
+    btnMain.textContent = isIdle ? 'START' : 'RESUME';
+    btnMain.style.background = '#e63946';
+    btnMain.style.color = '#fff';
+    btnMain.style.boxShadow = '0 0 28px #e6394650';
+    btnMain.style.border = 'none';
+    btnMain.onclick = handleMain;
+  }
+
+  // Slider values
+  document.getElementById('val-rounds').textContent = rounds;
+  document.getElementById('val-roundtime').textContent = fmt(roundTime);
+  document.getElementById('val-resttime').textContent = fmt(restTime);
+}
+
+// Initial render
+render();
+</script>
+
+</body>
+</html>
